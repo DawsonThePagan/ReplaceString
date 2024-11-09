@@ -15,12 +15,13 @@ Part of BatchExtensions [Trello](https://trello.com/b/4J5sT1MN/batchextensions)
 ## Arguments
 
 ```BATCH
-ReplaceString.exe /file <file> /from <text from> /to <text to> {/nocase}
+ReplaceString.exe /file <file> /from <text from> [/to <text to> | /rmline]  {/nocase}
 ```
 
 + /file = Required, file to edit
 + /from = Required, text to change from. See /nocase for case sensitivity
-+ /to = Required, text to change to
++ /to = Optional, text to change to. Mutually exclusive with 'rmline', only set one or the other
++ /rmline = Optional, remove any line containing from. Mutually exclusive with 'to', only set one or the other
 + /nocase = Optional, by default from in case sensitive, this disables that
 
 ## License

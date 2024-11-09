@@ -1,11 +1,12 @@
 use std::{env::{args, current_exe, set_current_dir}, fs::{self, copy, remove_file, File, OpenOptions}, io::{self, Read, Write}, path::Path, process};
 
-const VER: &str = "1.0";
+const VER: &str = "1.1";
 
 const ARG_FILE: &str = "/file";
 const ARG_FROM: &str = "/from";
 const ARG_TO: &str = "/to";
 const ARG_NO_CASE: &str = "/nocase";
+const ARG_REMOVE_LN: &str = "/rmline";
 const ARG_HELP: &str = "/help";
 
 const RET_OK: i32 = 0;
@@ -21,7 +22,8 @@ fn main() {
     let mut file: String = String::from("");
     let mut from: String = String::from("");
     let mut to: &str = "";
-    let mut case = true;
+    let mut remove_line: bool = false;
+    let mut case: bool = true;
 
     // Set working dir to location of EXE
     match current_exe() {
@@ -36,8 +38,7 @@ fn main() {
 
             match set_current_dir(&path_form) {
                 Ok(_) => {
-                    println!("=== ReplaceString Starting V{VER}===");
-                    println!();
+                    
                 }
 
                 Err(_) => {
@@ -70,7 +71,7 @@ fn main() {
             break;
         }
 
-        if args[arg_n].to_lowercase() == ARG_FILE {
+        else if args[arg_n].to_lowercase() == ARG_FILE {
             if args[arg_n + 1].starts_with(".\\") || args[arg_n + 1].contains(":\\") {
                 file = args[arg_n + 1].clone();
             }else{
@@ -80,26 +81,39 @@ fn main() {
             arg_n = arg_n + 1;
         }
 
-        if args[arg_n].to_lowercase() == ARG_FROM {
+        else if args[arg_n].to_lowercase() == ARG_FROM {
             from = args[arg_n + 1].clone();
             arg_n = arg_n + 1;
         }
 
-        if args[arg_n].to_lowercase() == ARG_TO {
+        else if args[arg_n].to_lowercase() == ARG_TO {
             to = args[arg_n + 1].as_str();
             arg_n = arg_n + 1;
         }
 
-        if args[arg_n].to_lowercase() == ARG_NO_CASE {
+        else if args[arg_n].to_lowercase() == ARG_NO_CASE {
             case = false;
+        }
+        else if args[arg_n].to_lowercase() == ARG_REMOVE_LN {
+            remove_line = true;
         }
 
         arg_n = arg_n + 1;
     }
 
     // Check the arguments are good
-    if file == "" || from == "" || to == "" {
+    if file == "" || from == "" {
         println!("Arguments not set correctly");
+        process::exit(RET_ERR_USER);
+    }
+
+    if to == "" && remove_line == false {
+        println!("You must set 'to' or 'rmline'");
+        process::exit(RET_ERR_USER);
+    }
+
+    if to != "" && remove_line == true {
+        println!("You cannot set both 'to' and 'rmline' at the same time");
         process::exit(RET_ERR_USER);
     }
 
@@ -108,7 +122,7 @@ fn main() {
         from = from.to_lowercase();
     }
 
-    println!("Checking if {file} exists");
+    // Check if file can be found
     if !Path::new(&file).is_file() {
         println!("Path provided does not exist");
         process::exit(RET_ERR_USER);
@@ -149,24 +163,31 @@ fn main() {
             line_check = line_check.to_lowercase();
         }
 
-        let line_edit;
+        let mut line_edit;
         if line_check.contains(&from) { // Find what needs to be changed
-            line_edit = line_check.replace(&from, to); // Try to change it
+            if remove_line {
+                changed = true;
+                continue;
+            }else {
+                line_edit = line_check.replace(&from, to); // Try to change it
             
-            // Above returns the output of the string after replacing requested. 
-            // We can check if it worked by checking if its same as the original
-            if line_edit == line_check { 
-                println!("Failed to replace text, unknown error");
-                drop(temp_out);
-                // Delete the file, doesn't matter if this works
-                _ = fs::remove_file(temp_file);
-                process::exit(RET_ERR_IO);
-            }
+                // Above returns the output of the string after replacing requested. 
+                // We can check if it worked by checking if its same as the original
+                if line_edit == line_check { 
+                    println!("Failed to replace text, unknown error");
+                    drop(temp_out);
+                    // Delete the file, doesn't matter if this works
+                    _ = fs::remove_file(temp_file);
+                    process::exit(RET_ERR_IO);
+                }
 
-            changed = true;
+                line_edit = line_edit + "\n";
+                changed = true;
+            }
+            
         }
         else{ // If its not there continue as normal
-            line_edit = line.to_string(); 
+            line_edit = line.to_string() + "\n"; 
         }
 
         // Write that to the buffer
@@ -247,6 +268,7 @@ fn pause() {
 }
 
 fn help() {
+    println!("=== Replace String V{VER} ===");
     println!("Replace a string in a file without using powershell");
     println!();
     println!("Return codes:");
@@ -259,7 +281,8 @@ fn help() {
     println!("Arguments:");
     println!("/file = Required, file to edit");
     println!("/from = Required, text to change from. See /nocase for case sensitivity");
-    println!("/to = Required, text to change to");
-    println!("/nocase = Optional, by default from in case sensitive, this disables that");
+    println!("/to = Optional, text to change to. Mutually exclusive with 'rmline', only set one or the other");
+    println!("/rmline = Optional, remove any line containing from. Mutually exclusive with 'to', only set one or the other");
+    println!("/nocase = Optional, by default 'from' in case sensitive, this disables that");
     println!();
 }
